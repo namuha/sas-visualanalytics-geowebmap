@@ -236,7 +236,7 @@ define([
                 var opacityVV = clonedRenderer.visualVariables.find(function (vv){ return vv.type === "opacity"; });
                 if (opacityVV) {
                     opacityVV.stops = [
-                        {opacity: 0, value: animationValueBefore}, 
+                        {opacity: 1, value: animationValueBefore},
                         {opacity: 1, value: animationValue},
                         {opacity: 0, value: animationValueAfter} 
                     ];

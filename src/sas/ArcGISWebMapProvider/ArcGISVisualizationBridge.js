@@ -610,6 +610,9 @@ define([
                 };
             }
 
+            if (_options.animation)
+                renderer.visualVariables.push(_animationHelper.buildAnimationVisualVariable(columns, _options.animation));
+
             if (!_util.hasColorCategory(_options.color, columns)) {
                 var colorColumnName = _util.getNameWithLabel(_options.color, columns);
                 var colorIndex = _util.getIndexWithLabel(_options.color, columns);
