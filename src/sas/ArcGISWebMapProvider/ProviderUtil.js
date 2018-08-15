@@ -53,10 +53,31 @@ define([
         },
 
         //Credit to: http://axonflux.com/handy-rgb-to-hsl-and-rgb-to-hsv-color-model-c
-        generateColors: function (numColors) {
+        generateColors: function (numColors, options) {
             var h = Math.floor(Math.random() * Math.floor(360));
             var goldenRatioConjugate = 0.618033988749895;
             var colors = [];
+
+            function convertHex(hex){
+                if (hex.charAt(0) === '#')
+                    hex = hex.replace('#','');
+                var r = parseInt(hex.substring(0,2), 16);
+                var g = parseInt(hex.substring(2,4), 16);
+                var b = parseInt(hex.substring(4,6), 16);
+
+                return {r: r, g: g, b: b, a: 1};
+            }
+
+            if (Array.isArray(options.customColors)) {
+                var customColors = options.customColors;
+                for (var j = 0; j < customColors.length; j++) {
+                    colors.push(convertHex(customColors[j]));
+                    numColors--;
+                }
+            } else if (typeof options.customColors === 'string') {
+                colors.push(convertHex(options.customColors));
+                numColors--;
+            }
 
             function hsvToRgb (s, v) {
                 var r, g, b;
@@ -100,7 +121,7 @@ define([
             });
 
             var keys = Object.keys(categoryVals);
-            var colors = this.generateColors(keys.length);
+            var colors = this.generateColors(keys.length, options);
 
             for (var i = 0; i < keys.length; i++) {
                 uniqueVals.push({
