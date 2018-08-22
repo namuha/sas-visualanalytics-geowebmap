@@ -439,6 +439,7 @@ define([
         createScatterRenderer: function(columns, rows) {
             var visualVariables = [];
             var renderer;
+            var minMax;
 
             if (_options.animation) 
                 visualVariables.push(_animationHelper.buildAnimationVisualVariable(columns, _options.animation));
@@ -473,6 +474,12 @@ define([
                     },
                     visualVariables: visualVariables
                 };
+            }
+
+            if (!_util.hasColorCategory(_options.color, columns)) {
+                renderer.visualVariables.push(_util.createColorVisualVariable(_options, columns, rows));
+                if (_options.useSmartLegends)
+                    _smartLegendHelper.expandTwoPartColorRange(visualVariables[visualVariables.length - 1].stops);
             }
 
             return renderer;
@@ -545,23 +552,7 @@ define([
                 renderer.visualVariables.push(_animationHelper.buildAnimationVisualVariable(columns, _options.animation));
 
             if (!_util.hasColorCategory(_options.color, columns)) {
-                var colorColumnName = _util.getNameWithLabel(_options.color, columns);
-                var colorIndex = _util.getIndexWithLabel(_options.color, columns);
-
-                minMax = _util.findMinMax(rows,colorIndex);
-                renderer.visualVariables.push({
-                    type: "color",
-                    field: colorColumnName,
-                    stops: [
-                    {
-                      value: minMax[0],
-                      color: _options.colorMin
-                    },
-                    {
-                      value: minMax[1],
-                      color: _options.colorMax
-                    }]
-                });
+                renderer.visualVariables.push(_util.createColorVisualVariable(_options, columns, rows));
                 if (_options.useSmartLegends)
                     _smartLegendHelper.expandTwoPartColorRange(visualVariables[visualVariables.length - 1].stops);
             }
@@ -630,27 +621,12 @@ define([
                     visualVariables: visualVariables
                 };
             }
-
+            
             if (_options.animation)
                 renderer.visualVariables.push(_animationHelper.buildAnimationVisualVariable(columns, _options.animation));
 
-            if (!_util.hasColorCategory(_options.color, columns)) {
-                var colorColumnName = _util.getNameWithLabel(_options.color, columns);
-                var colorIndex = _util.getIndexWithLabel(_options.color, columns);
-                minMax = _util.findMinMax(rows,colorIndex);
-                renderer.visualVariables.push({
-                    type: "color",
-                    field: colorColumnName,
-                    stops: [
-                    {
-                      value: minMax[0],
-                      color: _options.colorMin
-                    },
-                    {
-                      value: minMax[1],
-                      color: _options.colorMax
-                    }]
-                });
+            if (!_util.hasColorCategory(_options.color, columns) && _options.color) {
+                renderer.visualVariables.push(_util.createColorVisualVariable(_options, columns, rows));
                 if (_options.useSmartLegends)
                     _smartLegendHelper.expandTwoPartColorRange(visualVariables[visualVariables.length - 1].stops);
             }

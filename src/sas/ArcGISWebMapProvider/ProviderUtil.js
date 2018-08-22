@@ -151,6 +151,26 @@ define([
             return (columns[colorIndex].usage === "categorical" || columns[colorIndex].type === "string")
         },
 
+        createColorVisualVariable: function (options, columns, rows) {
+            var colorColumnName = this.getNameWithLabel(options.color, columns);
+            var colorIndex = this.getIndexWithLabel(options.color, columns);
+
+            var minMax = this.findMinMax(rows,colorIndex);
+            return {
+                type: "color",
+                field: colorColumnName,
+                stops: [
+                    {
+                        value: minMax[0],
+                        color: options.colorMin
+                    },
+                    {
+                        value: minMax[1],
+                        color: options.colorMax
+                    }]
+            };
+        },
+
         getNameWithLabel: function (label, columns) {
             var match = columns.find(function(column) { return column && column.label === label; });
             return (match) ? match.name : null;
