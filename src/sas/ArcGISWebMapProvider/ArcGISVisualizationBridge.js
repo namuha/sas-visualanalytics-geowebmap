@@ -261,45 +261,24 @@ define([
                         query.where = whereClause;
                     if (!isNaN(_options.featureServiceMaxAllowableOffset))
                         query.maxAllowableOffset = _options.featureServiceMaxAllowableOffset;
-                    queryLayer.queryFeatures(query).then(_util.proxy(function(results) {
 
-                        // Join the data to the geometries.
-
-                        var joinedFeatures = [];
-                        results.features.forEach(function (feature) {
-
-                            // VA attributes, mapped by _options.geoId, are joined to the feature layer geometries 
-                            // by _options.featureLayerGeoId.
-
-                            var dataMatch = geoIdAttributeMap[feature.attributes[_options.featureServiceGeoId]];  
-
-                            if (dataMatch) {
-                                for (var key in dataMatch) {
-                                    if (dataMatch.hasOwnProperty(key))
-                                        feature.attributes[key] = dataMatch[key];
-                                }
-                                joinedFeatures.push(feature);
-                                delete geoIdAttributeMap[feature.attributes[_options.featureServiceGeoId]]
-                            }
-
-                        });
-
+                    var createChoroplethLayer = function (joinedFeatures, results, context){
                         if (_options.filterToFeatureServiceGeoId)
-                            this.filterToFeatureServiceGeoId(whereClause);
+                            context.filterToFeatureServiceGeoId(whereClause);
 
                         // Build the feature layer from the geometries joined with the data.
 
                         var viewLayer = new FeatureLayer({
                             id: _sasFeatureLayerId,
                             title: _options.title,
-                            source: joinedFeatures, 
-                            fields: fields, 
-                            objectIdField: _util.getObjectIdFieldName(), 
-                            renderer: renderer, 
+                            source: joinedFeatures,
+                            fields: fields,
+                            objectIdField: _util.getObjectIdFieldName(),
+                            renderer: renderer,
                             spatialReference: lang.clone(results.spatialReference),
                             // Note: there are ArcGIS 4.6 hit-test related problems with SceneViews with elevation mode "on-the-ground"
                             geometryType: "polygon",
-                            popupTemplate: this.createGenericUnformattedPopupTemplate(event.data.columns)
+                            popupTemplate: context.createGenericUnformattedPopupTemplate(event.data.columns)
                         });
                         viewLayer.then(function(layer){
                             // See https://community.esri.com/message/693120-re-sceneview-source-polygons-no-popup?commentID=693120#comment-693120
@@ -312,11 +291,53 @@ define([
                             }
                         });
 
-                        this.addOrReplaceSasLayer(viewLayer);
+                        context.addOrReplaceSasLayer(viewLayer);
 
-                        this.validateGeoIds(event.data.columns, geoIdAttributeMap);
+                        context.validateGeoIds(event.data.columns, geoIdAttributeMap);
+                    }
 
-                    },this), function (e){ _util.logError(e); });
+                    var queryFunction = function (results, previousFeatures, context) {
+                        // Join the data to the geometries.
+
+                        var joinedFeatures = !previousFeatures ? [] : previousFeatures;
+                        results.features.forEach(function (feature) {
+
+                            // VA attributes, mapped by _options.geoId, are joined to the feature layer geometries
+                            // by _options.featureLayerGeoId.
+
+                            var dataMatch = geoIdAttributeMap[feature.attributes[_options.featureServiceGeoId]];
+
+                            if (dataMatch) {
+                                for (var key in dataMatch) {
+                                    if (dataMatch.hasOwnProperty(key))
+                                        feature.attributes[key] = dataMatch[key];
+                                }
+                                joinedFeatures.push(feature);
+                                delete geoIdAttributeMap[feature.attributes[_options.featureServiceGeoId]]
+                            }
+
+                        });
+
+                        if (results.exceededTransferLimit) {
+                            var serviceIDField;
+                            queryLayer.fields.forEach(function (field) {
+                                if (field.type === "oid")
+                                    serviceIDField = field.name;
+                            });
+                            query.where = serviceIDField + ">" + (joinedFeatures.length - 1);
+                            queryLayer.queryFeatures(query).then(
+                              _util.proxy(function (nestedResults) {
+                                  queryFunction(nestedResults, joinedFeatures, context);
+                              },context), function (e){ _util.logError(e); });
+                        } else {
+                            createChoroplethLayer(joinedFeatures, results, context);
+                        }
+                    }
+
+                    queryLayer.queryFeatures(query).then(
+                      _util.proxy(function (results) {
+                          queryFunction(results, null, this);
+                      },this), function (e){ _util.logError(e); });
 
                 }
 
