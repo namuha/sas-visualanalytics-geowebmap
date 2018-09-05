@@ -1,21 +1,21 @@
 /*
-Copyright 2018 SAS Institute Inc.
+ Copyright 2018 SAS Institute Inc.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
 
-    https://www.apache.org/licenses/LICENSE-2.0
+ https://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ */
 
 /**
- * Responsible for consuming incoming data from SAS Visual Analytics to create a 
+ * Responsible for consuming incoming data from SAS Visual Analytics to create a
  * feature layer in a web map.
  */
 define([
@@ -25,24 +25,25 @@ define([
     "esri/widgets/Legend",
     "esri/core/lang",
     "sas/ArcGISWebMapProvider/AnimationHelper",
+    "esri/geometry/geometryEngine",
     "sas/ArcGISWebMapProvider/SmartLegendHelper",
     "sas/ArcGISWebMapProvider/SelectionHelper",
     "sas/ArcGISWebMapProvider/ProviderUtil",
     "dojo/dom-construct",
     "dojo/request/xhr",
     "dojo/_base/declare"
-], function(Point, FeatureLayer, Expand, Legend, lang, AnimationHelper, SmartLegendHelper, SelectionHelper, ProviderUtil, domConstruct, xhr, declare){
+], function(Point, FeatureLayer, Expand, Legend, lang, AnimationHelper, geometryEngine, SmartLegendHelper, SelectionHelper, ProviderUtil, domConstruct, xhr, declare){
 
     var _options;
     var _mapView;
     var _sasLegend;
     var _util;
     var _animationHelper;
-    var _selectionHelper;    
+    var _selectionHelper;
     var _smartLegendHelper;
     var _sasFeatureLayerId = "_sasFeatureLayerId";
     var _lastMessageReceivedBeforeMapViewRegistered;
-    var _hasUserPanned = false; // Tagged to allow automatically fitting extent to data 
+    var _hasUserPanned = false; // Tagged to allow automatically fitting extent to data
                                 // unless the user has manually panned.
     var _warningControl;
 
@@ -61,8 +62,8 @@ define([
 
             _options.visualizationType = (_options.visualizationType) ? _options.visualizationType.toUpperCase() : null;
             if (_options.visualizationType !== _util.getScatterValue() &&
-                _options.visualizationType !== _util.getBubbleValue() &&
-                _options.visualizationType !== _util.getChoroplethValue()) {
+              _options.visualizationType !== _util.getBubbleValue() &&
+              _options.visualizationType !== _util.getChoroplethValue()) {
                 if (_options.geoId)
                     _options.visualizationType = _util.getChoroplethValue();
                 else if (_options.size)
@@ -77,14 +78,14 @@ define([
             if (_options.colorMin === undefined || _options.colorMin === null)
                 _options.colorMin = "#bfe4e7"; // Or a named color, e.g., "blue".
             if (_options.colorMax === undefined || _options.colorMax === null)
-                _options.colorMax = "#00929f";                 
+                _options.colorMax = "#00929f";
             if (_options.outline === undefined || _options.outline === null)
-                _options.outline = "#007E88"; 
-                
+                _options.outline = "#007E88";
+
             _options.title = _options.title || _options.geoId || "SAS VA Layer";
-                
+
             _options.useSampleData = (_options.useSampleData && _options.useSampleData.toUpperCase() === "TRUE");
-                
+
             _options.useSmartLegends = (_options.useSmartLegends && _options.useSmartLegends.toUpperCase() === "TRUE");
 
             if (_options.featureServiceWhere && _options.featureServiceWhere.length < 1)
@@ -107,13 +108,13 @@ define([
 
             if (_options.useSmartLegends)
                 _smartLegendHelper = new SmartLegendHelper();
-                
-        }, 
-    
+
+        },
+
         registerMapView: function (mapView) {
 
             _mapView = mapView;
-            
+
             if (_options.visualizationType !== _util.getScatterValue() || _options.color) {
                 _sasLegend = new Legend({view: _mapView, container: document.createElement("div")});
                 var legendExpand = new Expand({expandIconClass: "esri-icon-question", view: _mapView, content: _sasLegend.domNode, group: "bottom-right"});
@@ -128,15 +129,15 @@ define([
                 xhr("sas/ArcGISWebMapProvider/SampleData.json", {
                     handleAs: "json"
                 }).then(_util.proxy(function(result){
-                    if (_options.useSampleData && _options.animation)
-                       _animationHelper.generateSampleAnimationData(result, _options.color, _options.size, _options.animation);
-                    this.onMessage({data: result, origin: window.location.origin});
-                }, this),
-                function(error) {
-                    _util.logError(error);
-                });
+                      if (_options.useSampleData && _options.animation)
+                          _animationHelper.generateSampleAnimationData(result, _options.color, _options.size, _options.animation);
+                      this.onMessage({data: result, origin: window.location.origin});
+                  }, this),
+                  function(error) {
+                      _util.logError(error);
+                  });
 
-            // Else if data has already arrived, load it.
+                // Else if data has already arrived, load it.
 
             } else if (_lastMessageReceivedBeforeMapViewRegistered) {
                 this.onMessage(_lastMessageReceivedBeforeMapViewRegistered);
@@ -149,7 +150,7 @@ define([
                 _mapView.highlightOptions.color = _options.outline;
 
             _selectionHelper.registerMapView(_mapView, _sasFeatureLayerId);
-    
+
         },
 
         onMessage: function(event) {
@@ -163,24 +164,24 @@ define([
          * Builds a SAS feature layer from the incoming data.
          */
         processMessageEvent: function (event) {
-            if (event.data && event.data.columns && event.data.data) {   
-                
+            if (event.data && event.data.columns && event.data.data) {
+
                 if (!this.validateFeaturesMax(event.data.data, _options.featuresMax)) {
                     this.removeSasLayer();
                     return;
                 }
-                
+
                 _selectionHelper.registerMapData(
-                    event.data.resultName, // Identifier for incoming data set.
-                    _util.getNameWithUsage("brush", event.data.columns), // Name of column with selection brushing boolean.
-                    _options.use3D
+                  event.data.resultName, // Identifier for incoming data set.
+                  _util.getNameWithUsage("brush", event.data.columns), // Name of column with selection brushing boolean.
+                  _options.use3D
                 );
 
-                this.purgeSasIdiom(event.data.data, event.data.columns);                    
+                this.purgeSasIdiom(event.data.data, event.data.columns);
 
                 if (_options.animation)
                     _animationHelper.initializeAnimationData(event, _options.animation);
-        
+
                 var graphics = this.createGraphics(event.data.columns, event.data.data);
                 var fields = this.createFields(event.data.columns);
 
@@ -197,18 +198,18 @@ define([
                     // Create feature layer using client-side graphics.
 
                     var layer = new FeatureLayer({
-                            id: _sasFeatureLayerId,
-                            title: _options.title,
-                            source: graphics, 
-                            fields: fields, 
-                            objectIdField: _util.getObjectIdFieldName(), 
-                            renderer: renderer, 
-                            spatialReference: {
-                                wkid: 4326
-                            },
-                            geometryType: "point", 
-                            popupTemplate: this.createGenericUnformattedPopupTemplate(event.data.columns)
-                        });
+                        id: _sasFeatureLayerId,
+                        title: _options.title,
+                        source: graphics,
+                        fields: fields,
+                        objectIdField: _util.getObjectIdFieldName(),
+                        renderer: renderer,
+                        spatialReference: {
+                            wkid: 4326
+                        },
+                        geometryType: "point",
+                        popupTemplate: this.createGenericUnformattedPopupTemplate(event.data.columns)
+                    });
 
                     this.addOrReplaceSasLayer(layer);
 
@@ -228,30 +229,30 @@ define([
                     // browsing-by-area.  It's not always better, though, since the browser
                     // caches responses; so an unfiltered query is usually never requeried.
                     // On the other hand, unfiltered queries on some feature services can be
-                    // punishing.  
+                    // punishing.
 
                     var whereClause;
 
                     if (!_options.featureServiceWhere && graphics.length === 1) {
-                        whereClause = 
-                            _options.featureServiceGeoId + 
-                            " IN (" + 
-                            _util.sqlEscape(Object.keys(geoIdAttributeMap)).join() + 
-                            ")";
+                        whereClause =
+                          _options.featureServiceGeoId +
+                          " IN (" +
+                          _util.sqlEscape(Object.keys(geoIdAttributeMap)).join() +
+                          ")";
                     }
 
-                    // Fetch _all_ the choropleth geometries, requesting only the attributes 
-                    // necessary to join the rows to the IDs.  Potential optimizations: 
+                    // Fetch _all_ the choropleth geometries, requesting only the attributes
+                    // necessary to join the rows to the IDs.  Potential optimizations:
                     // Cache geometries.  Implement paging.
 
                     var queryLayer = new FeatureLayer({
                         url: _options.featureServiceUrl,
-                        objectIdField: _util.getObjectIdFieldName(), 
+                        objectIdField: _util.getObjectIdFieldName(),
                         spatialReference: {
                             wkid: 4326
                         }
                     });
-                    
+
                     var query = queryLayer.createQuery();
                     query.outFields = [_options.featureServiceGeoId]; // Note: ["*"] Gets _all_ attributes, which noticeably slows performance.
                     query.outSpatialReference = {wkid: 4326};
@@ -330,6 +331,7 @@ define([
                                   queryFunction(nestedResults, joinedFeatures, context);
                               },context), function (e){ _util.logError(e); });
                         } else {
+                            context.calculateIntersections(joinedFeatures);
                             createChoroplethLayer(joinedFeatures, results, context);
                         }
                     }
@@ -368,22 +370,22 @@ define([
                     // TODO: VA has a "Reset Zoom" feature that would move the extent
                     // back to the last goTo (see the Home widget) and that would
                     // essentially reset _hasUserPanned to false.
-                    if (!_hasUserPanned || _options.visualizationType === _util.getChoroplethValue()) 
+                    if (!_hasUserPanned || _options.visualizationType === _util.getChoroplethValue())
                         this.goToDataExtent(sasLayerReadied);
-    
-                    if (_options.animation) 
+
+                    if (_options.animation)
                         _animationHelper.initializeAnimation(sasLayerReadied);
 
                     if (_sasLegend)
                         sasLayerReadied.layerInfos = [{layer: sasLayerReadied, title: _options.title}];
-                    
+
                     if (_options.useSmartLegends)
                         _smartLegendHelper.addSmartLegends(sasLayerReadied, this.getMapView());
-                    
+
                 }, this));
 
             }
-        }, 
+        },
 
         removeSasLayer: function() {
 
@@ -397,7 +399,7 @@ define([
                     map.remove(oldLayer);
 
             }
-        }, 
+        },
 
         convertRowsToObjects: function(columns, rows) {
             return rows.map(function (row, i) {
@@ -428,7 +430,7 @@ define([
             return rowObjects.map(function (row) {
                 return {
                     geometry: new Point({
-                        x: !_util.isValidCoordinate(row[longitudeColumnName]) ? 0 : row[longitudeColumnName], 
+                        x: !_util.isValidCoordinate(row[longitudeColumnName]) ? 0 : row[longitudeColumnName],
                         y: !_util.isValidCoordinate(row[latitudeColumnName]) ? 0 : row[latitudeColumnName]
                     }), // Assumes wkid 102100.
                     attributes: row
@@ -441,7 +443,7 @@ define([
             var renderer;
             var minMax;
 
-            if (_options.animation) 
+            if (_options.animation)
                 visualVariables.push(_animationHelper.buildAnimationVisualVariable(columns, _options.animation));
 
             if (_util.hasColorCategory(_options.color, columns)) {
@@ -533,14 +535,14 @@ define([
                     field: sizeColumnName,
                     valueUnit: "unknown",
                     stops: [
-                    {
-                      value: minMax[0],
-                      size: 6 // (!_options.use3D) ? 6 : 100000
-                    },
-                    {
-                      value: minMax[1], 
-                      size: 30 // (!_options.use3D) ? 30 : 500000
-                    }],
+                        {
+                            value: minMax[0],
+                            size: 6 // (!_options.use3D) ? 6 : 100000
+                        },
+                        {
+                            value: minMax[1],
+                            size: 30 // (!_options.use3D) ? 30 : 500000
+                        }],
                     minDataValue: minMax[0],
                     maxDataValue: minMax[1],
                     minSize: 6,
@@ -558,14 +560,14 @@ define([
             }
 
             // This 3D render requires the symbol to be measured in meters, and the correct
-            // choice really depends on the expected extent; so, if it were generalized, 
-            // it would have to be exposed as another querystring option. See the 
+            // choice really depends on the expected extent; so, if it were generalized,
+            // it would have to be exposed as another querystring option. See the
             // commented code in the visualVariables definition above.
             // } else {
             //     renderer =  {
-            //         type: "simple", 
+            //         type: "simple",
             //         symbol: {
-            //             type: "point-3d", 
+            //             type: "point-3d",
             //             symbolLayers: [{
             //                 type: "object",
             //                 width: 0,
@@ -573,8 +575,8 @@ define([
             //                 depth: 0,
             //                 resource: { primitive: "cylinder" }
             //             }],
-            //             outline: { 
-            //                 color: _options.outline,  
+            //             outline: {
+            //                 color: _options.outline,
             //                 width: 0.5
             //             }
             //         },
@@ -621,7 +623,7 @@ define([
                     visualVariables: visualVariables
                 };
             }
-            
+
             if (_options.animation)
                 renderer.visualVariables.push(_animationHelper.buildAnimationVisualVariable(columns, _options.animation));
 
@@ -644,7 +646,7 @@ define([
                     fieldInfos.push(fieldInfo);
                 }
             });
-            return {title: _options.title, content: [{type: "fields", fieldInfos: fieldInfos}], fieldInfos: []}; 
+            return {title: _options.title, content: [{type: "fields", fieldInfos: fieldInfos}], fieldInfos: []};
         },
 
         purgeSasIdiom: function(rows, columns) {
@@ -666,7 +668,7 @@ define([
 
         },
 
-        /** 
+        /**
          * We may not keep "filterToFeatureServiceGeoId", since the use case is narrow.
          * When a single region is being displayed, the feature will filter
          * all other FeatureLayers in the map by the value of that region
@@ -678,16 +680,16 @@ define([
             if (whereClause && whereClause.length > 0) {
                 this.getMapView().map.allLayers.forEach(function(layer){
 
-                    if (layer.type && layer.type === "feature" && 
-                        layer.id !== _sasFeatureLayerId &&
-                        layer.fields) {
+                    if (layer.type && layer.type === "feature" &&
+                      layer.id !== _sasFeatureLayerId &&
+                      layer.fields) {
 
                         var layerHasGeoId = layer.fields.find(function (f){ return f.name === _options.featureServiceGeoId });
-                        
-                        if (layerHasGeoId) 
+
+                        if (layerHasGeoId)
                             layer.definitionExpression = whereClause;
                         else
-                            layer.definitionExpression = "";  
+                            layer.definitionExpression = "";
 
                     }
 
@@ -702,16 +704,16 @@ define([
             var latitudeColumnIndex = _util.getIndexWithLabel(_options.y, columns);
             var longitudeColumnIndex = _util.getIndexWithLabel(_options.x, columns);
 
-            // TODO: Localize warnings.  
+            // TODO: Localize warnings.
 
             if (latitudeColumnIndex < 0 || longitudeColumnIndex < 0) {
                 warning = "Data for 'x' or 'y' coordinates could not be identified.";
             } else {
                 rows.forEach(function(row){
-                    if (!_util.isValidCoordinate(row[latitudeColumnIndex]) || 
-                        !_util.isValidCoordinate(row[longitudeColumnIndex]) ||
-                        Math.abs(Math.round(row[latitudeColumnIndex])) > 90 || 
-                        Math.abs(Math.round(row[longitudeColumnIndex])) > 180) {
+                    if (!_util.isValidCoordinate(row[latitudeColumnIndex]) ||
+                      !_util.isValidCoordinate(row[longitudeColumnIndex]) ||
+                      Math.abs(Math.round(row[latitudeColumnIndex])) > 90 ||
+                      Math.abs(Math.round(row[longitudeColumnIndex])) > 180) {
                         ++invalidCount;
                     }
                 });
@@ -731,7 +733,7 @@ define([
 
             // TODO: Localize warnings.
 
-            if (graphics.length > maximum) 
+            if (graphics.length > maximum)
                 warning = "Feature count (" + graphics.length + ") exceeds maximum allowed (" + maximum + ").  Please filter your results.";
 
             this.setWarning(warning);
@@ -742,8 +744,8 @@ define([
         validateGeoIds: function (columns, geoIdMap) {
 
             var warning = "";
-  
-            // TODO: Localize warnings. 
+
+            // TODO: Localize warnings.
 
             if (_util.getIndexWithLabel(_options.geoId, columns) < 0) {
                 warning = "Data for 'geoId' could not be identified.";
@@ -751,7 +753,7 @@ define([
                 var missingIds = Object.keys(geoIdMap);
                 if (missingIds.length > 0) {
                     warning = "Some geoIds could not be found with the feature service: " +
-                        missingIds.slice(0,5).join(", ") + ((missingIds.length > 5) ? " ..." : ".");
+                      missingIds.slice(0,5).join(", ") + ((missingIds.length > 5) ? " ..." : ".");
                 }
             }
 
@@ -767,10 +769,10 @@ define([
                 case _util.getChoroplethValue():
                     return this.validateRequiredOptions(['geoId', 'featureServiceUrl', 'featureServiceGeoId']);
                 case _util.getBubbleValue():
-                    return this.validateRequiredOptions(['x', 'y', 'size']);             
+                    return this.validateRequiredOptions(['x', 'y', 'size']);
                 case _util.getScatterValue():
                 default:
-                    return this.validateRequiredOptions(['x', 'y']);             
+                    return this.validateRequiredOptions(['x', 'y']);
             }
 
         },
@@ -787,9 +789,9 @@ define([
 
             // TODO: Localize warnings.
 
-            if (missingNames.length > 0) 
-               message = "The following required options were not identified: " + missingNames.join(", ") + ".";
-            
+            if (missingNames.length > 0)
+                message = "The following required options were not identified: " + missingNames.join(", ") + ".";
+
             this.setWarning(message);
 
             return message.length === 0;
@@ -801,10 +803,10 @@ define([
                 var validationDiv = domConstruct.toDom("<div class='warning'></div>");
                 _warningControl = new Expand({
                     id: "sasWarningControl",
-                    expandIconClass: "esri-icon-notice-triangle", 
-                    view: _mapView, 
-                    content: validationDiv, 
-                    group: "bottom-right", 
+                    expandIconClass: "esri-icon-notice-triangle",
+                    view: _mapView,
+                    content: validationDiv,
+                    group: "bottom-right",
                     expanded: true
                 });
             }
@@ -851,6 +853,36 @@ define([
                     });
                 }
             });
+        },
+
+        calculateIntersections: function (lavaFeatures) {
+            var ischaemumLayer = new FeatureLayer({
+                url: "https://services7.arcgis.com/W5awwALRgdQoWumf/arcgis/rest/services/usfws_Q3OB_P01_Cyrtandra_nanawaleensis_current_range/FeatureServer",
+                spatialReference: {
+                    wkid: 4326
+                }
+            });
+
+            var ischaemumQuery = ischaemumLayer.createQuery();
+
+            var cyrtandraLayer = new FeatureLayer({
+                url: "https://services7.arcgis.com/W5awwALRgdQoWumf/arcgis/rest/services/usfws_Q2BT_P01_Ischaemum_byrone_current_range/FeatureServer",
+                spatialReference: {
+                    wkid: 4326
+                }
+            });
+
+            ischaemumLayer.queryFeatures(ischaemumQuery).then(function (results) {
+                var ischaemumGeometry = results.features[0].geometry
+                var area = 0;
+                lavaFeatures.forEach(function (feature) {
+                    var intersect = geometryEngine.intersect(feature.geometry, ischaemumGeometry);
+                    console.log(intersect);
+                    if (area)
+                        area += geometryEngine.geodesicArea(intersect, "square-miles");
+                    console.log(area);
+                });
+            }, function (e){ _util.logError(e); });
         }
 
     });
